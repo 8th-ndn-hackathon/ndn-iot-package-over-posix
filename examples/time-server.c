@@ -125,7 +125,7 @@ int on_interest(const uint8_t* interest, uint32_t interest_size){
   ndn_data_tlv_encode_digest_sign(&encoder, &data);
   ndn_forwarder_on_incoming_data(ndn_forwarder_get_instance(),
                                  &face->intf,
-                                 &name_prefix,
+                                 &data.name,
                                  encoder.output_value,
                                  encoder.offset);
 
