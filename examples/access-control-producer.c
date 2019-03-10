@@ -141,7 +141,7 @@ on_time_interest(const uint8_t* interest, uint32_t interest_size)
 
   // send data
   gettimeofday(&tv, NULL);
-  char data_string[20];
+  char data_string[32];
 
   struct tm *current_time = localtime(&(tv.tv_sec));
   strftime(data_string, sizeof(data_string), "the time is %H:%M:%S\n", current_time);
@@ -154,8 +154,11 @@ on_time_interest(const uint8_t* interest, uint32_t interest_size)
     char keyid_string[] = "/ndn/SD/erynn/time/KEY/100";
     ndn_name_t keyid;
     ret_val = ndn_name_from_string(&keyid, keyid_string, sizeof(keyid_string));
-    ndn_data_set_encrypted_content(&data, (uint8_t*)data_string, sizeof(data_string),
-                                   &keyid, iv, aes_key);
+    ret_val = ndn_data_set_encrypted_content(&data, (uint8_t*)data_string, sizeof(data_string),
+                                             &keyid, iv, aes_key);
+    if (ret_val != 0) {
+      print_error("producer", "encrypt content", "ndn_data_set_encrypted_content", ret_val);
+    }
   }
   else {
     ndn_data_set_content(&data, data_string, strlen(data_string));
@@ -165,6 +168,7 @@ on_time_interest(const uint8_t* interest, uint32_t interest_size)
   ndn_metainfo_set_content_type(&data.metainfo, NDN_CONTENT_TYPE_BLOB);
   encoder_init(&encoder, buffer, 4096);
   ndn_data_tlv_encode_digest_sign(&encoder, &data);
+  printf("data tlv size %d\n", encoder.offset);
   ndn_forwarder_on_incoming_data(ndn_forwarder_get_instance(),
                                  &udp_face->intf, &data.name,
                                  encoder.output_value, encoder.offset);

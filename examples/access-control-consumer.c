@@ -295,7 +295,7 @@ main(int argc, char *argv[])
       // After time is done, discover service every 1 sec
       if(count % 100 == 0){
         count = 0;
-        
+
         service_number = -1;
         ndn_sd_context_t *sd_context = ndn_sd_get_sd_context();
         for (int i = 0; i < NDN_APPSUPPORT_NEIGHBORS_SIZE; ++i) {
@@ -307,7 +307,7 @@ main(int argc, char *argv[])
             for (uint8_t i = 0; i < entry->identity.size; i++)
                 printf("%c", (char)entry->identity.value[i]);
             printf("\n");
-            
+
             for (int i = 0; i < NDN_APPSUPPORT_SERVICES_SIZE; ++i) {
                 if (entry->services[i].id_size == -1) continue;
                 if (strcmp(service_need, entry->services[i].id_value) == 0)
