@@ -6,6 +6,10 @@
  * directory for more details.
  */
 
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
 #include "ndn-udp-multicast-face.h"
 #include <sys/ioctl.h>
 #include <errno.h>
