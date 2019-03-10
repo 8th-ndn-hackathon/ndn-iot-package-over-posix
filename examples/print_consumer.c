@@ -14,6 +14,9 @@
 #include "ndn-lite/security/ndn-lite-ecc.h"
 #include "ndn-lite/ndn-services.h"
 
+ndn_ecc_pub_t* pub_key = NULL;
+ndn_ecc_prv_t* prv_key = NULL;
+
 const uint8_t pub[] = {
     0x36, 0xF7, 0xEF, 0x7C, 0x05, 0x10, 0x68, 0xC4, 0x6C, 0x67,
     0x63, 0x2A, 0xF5, 0x82, 0x1D, 0x14, 0xBA, 0xCC, 0x50, 0x12,
@@ -81,8 +84,6 @@ int main()
     ret_val = ndn_direct_face_register_prefix(comp_consumer, on_advertisement);
     
     // shared pub and prv keys
-    ndn_ecc_pub_t* pub_key = NULL;
-    ndn_ecc_prv_t* prv_key = NULL;
     ndn_key_storage_init();
     ndn_key_storage_get_empty_ecc_key(&pub_key, &prv_key);
     ret_val = ndn_ecc_prv_init(prv_key, prv, sizeof(prv),
