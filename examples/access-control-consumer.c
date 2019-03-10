@@ -92,6 +92,15 @@ on_data(const uint8_t* data, uint32_t data_size)
     print_error("producer", "on_data", "ndn_ac_on_ek_response", ret_val);
   }
 
+  send_time_request();
+
+  count = 0;
+  while (count < 10000) {
+    ndn_udp_multicast_face_recv(udp_face);
+    usleep(10);
+    count++;
+  }
+
   return 0;
 }
 
@@ -272,8 +281,6 @@ main(int argc, char *argv[])
       // After time is done, discover service every 1000
     }
   }
-
-  send_time_request();
 
   return 0;
 }

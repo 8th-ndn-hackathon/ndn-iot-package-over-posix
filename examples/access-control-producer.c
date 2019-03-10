@@ -111,7 +111,6 @@ int
 on_interest2(const uint8_t* interest, uint32_t interest_size)
 {
   int ret_val = -1;
-  ndn_data_t data;
   ndn_encoder_t encoder;
   struct timeval tv;
 
@@ -148,6 +147,7 @@ on_interest2(const uint8_t* interest, uint32_t interest_size)
   struct tm *current_time = localtime(&(tv.tv_sec));
   strftime(data_string, 50, "the time is %H:%M:%S\n", current_time);
 
+  ndn_data_t data;
   data.name = interest1.name;
 
   // encrypt the content
@@ -234,12 +234,12 @@ main(int argc, char *argv[])
 
   // add route to the network
   char prefix_string[] = "/ndn";
-  ndn_name_t controller_prefix;
-  ret_val = ndn_name_from_string(&controller_prefix, prefix_string, sizeof(prefix_string));
+  ndn_name_t fib_prefix;
+  ret_val = ndn_name_from_string(&fib_prefix, prefix_string, sizeof(prefix_string));
   if (ret_val != 0) {
     print_error("consumer", "add route", "ndn_name_from_string", ret_val);
   }
-  ndn_forwarder_fib_insert(&controller_prefix, &udp_face->intf, 0);
+  ndn_forwarder_fib_insert(&fib_prefix, &udp_face->intf, 0);
 
   // register prefix 1 for SD
   char prefix1_string[] = "/ndn/SD/erynn/QUERY";
@@ -277,7 +277,7 @@ main(int argc, char *argv[])
   // send out Interest to AC controller
   ndn_interest_t interest;
   ndn_interest_from_block(&interest, interest_encoder.output_value, interest_encoder.offset);
-  ndn_direct_face_express_interest(&controller_prefix, interest_encoder.output_value,
+  ndn_direct_face_express_interest(&interest.name, interest_encoder.output_value,
                                    interest_encoder.offset, on_data, NULL);
 
   while (true) {
