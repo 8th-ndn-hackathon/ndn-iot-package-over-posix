@@ -89,8 +89,8 @@ int on_interest(const uint8_t* interest, uint32_t interest_size){
         printf("ERROR: Unable to decode Interest. (%d)\n", ret_val);
         return ret_val;
     }
-    name_component_t command = decoded_interest.name.components[3];
-    parsing(command , strlen(command));
+    name_component_t command = decoded_interest.name.components[4];
+    parsing(command.value , command.size);
     return NDN_SUCCESS;
 }
 
