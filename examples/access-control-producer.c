@@ -42,8 +42,6 @@ in_addr_t multicast_ip;
 int
 parseArgs(int argc, char *argv[]) {
   char *sz_addr;
-  struct hostent *host_addr;
-  struct in_addr **paddrs;
 
   if (argc < 2) {
     sz_addr = defaultaddr;
@@ -100,7 +98,7 @@ main(int argc, char *argv[])
 
   // set home prefix
   ndn_name_t home_prefix;
-  char* home_prefix_str = "/ndn";
+  char home_prefix_str[] = "/ndn";
   ret_val = ndn_name_from_string(&home_prefix, home_prefix_str, sizeof(home_prefix_str));
   if (ret_val != 0) {
     print_error("producer", "set home prefix", "ndn_name_from_string", ret_val);
@@ -141,16 +139,6 @@ main(int argc, char *argv[])
   // init ac state
   ndn_ac_state_init(&producer_identity, pub_key, prv_key);
 
-  // prepare EK Interest
-  uint8_t buffer[1024];
-  ndn_encoder_t interest_encoder;
-  encoder_init(&interest_encoder, buffer, sizeof(buffer));
-  ret_val = ndn_ac_prepare_key_request_interest(&interest_encoder, &home_prefix, &component_producer,
-                                                100, prv_key, 1);
-  if (ret_val != 0) {
-    print_error("producer", "prepare EK Interest", "ndn_ac_prepare_key_request", ret_val);
-  }
-
   // set up direct face and forwarder
   ndn_forwarder_init();
   ndn_direct_face_construct(666);
@@ -165,6 +153,20 @@ main(int argc, char *argv[])
     print_error("consumer", "add route", "ndn_name_from_string", ret_val);
   }
   ndn_forwarder_fib_insert(&controller_prefix, &udp_face->intf, 0);
+
+  // prepare EK Interest
+  uint8_t buffer[1024];
+  ndn_encoder_t interest_encoder;
+  encoder_init(&interest_encoder, buffer, sizeof(buffer));
+  ret_val = ndn_ac_prepare_key_request_interest(&interest_encoder, &home_prefix, &component_producer,
+                                                100, prv_key, 1);
+  if (ret_val != 0) {
+    print_error("producer", "prepare EK Interest", "ndn_ac_prepare_key_request", ret_val);
+  }
+
+  // send out Interest
+  ndn_direct_face_express_interest(&controller_prefix, interest_encoder.output_value,
+                                   interest_encoder.offset, on_data, NULL);
 
   while (true) {
     ndn_udp_multicast_face_recv(udp_face);

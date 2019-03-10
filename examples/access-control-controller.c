@@ -38,6 +38,7 @@ ndn_ecc_pub_t* pub_key = NULL;
 ndn_ecc_prv_t* prv_key = NULL;
 char defaultaddr[] = "225.0.0.37";
 in_addr_t multicast_ip;
+ndn_udp_multicast_face_t* udp_face;
 
 ndn_name_t controller_identity;
 ndn_interest_t ek_interest;
@@ -45,8 +46,6 @@ ndn_interest_t ek_interest;
 int
 parseArgs(int argc, char *argv[]) {
   char *sz_addr;
-  struct hostent *host_addr;
-  struct in_addr **paddrs;
 
   if (argc < 2) {
     sz_addr = defaultaddr;
@@ -95,6 +94,11 @@ on_interest(const uint8_t* interest, uint32_t interest_size)
   ret_val = ndn_data_tlv_encode_ecdsa_sign(&encoder, &response, &controller_identity,
                                            prv_key);
 
+  ndn_forwarder_on_incoming_data(ndn_forwarder_get_instance(),
+                                 &udp_face->intf,
+                                 &response.name,
+                                 encoder.output_value,
+                                 encoder.offset);
   return 0;
 }
 
@@ -155,7 +159,6 @@ main(int argc, char *argv[])
   // set up direct face and forwarder
   ndn_forwarder_init();
   ndn_direct_face_construct(666);
-  ndn_udp_multicast_face_t* udp_face;
   udp_face = ndn_udp_multicast_face_construct(667, INADDR_ANY, 6363, multicast_ip);
 
   // register prefix

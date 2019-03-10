@@ -42,8 +42,6 @@ in_addr_t multicast_ip;
 int
 parseArgs(int argc, char *argv[]) {
   char *sz_addr;
-  struct hostent *host_addr;
-  struct in_addr **paddrs;
 
   if (argc < 2) {
     sz_addr = defaultaddr;
@@ -100,8 +98,8 @@ main(int argc, char *argv[])
 
   // set home prefix
   ndn_name_t home_prefix;
-  char* home_prefix_str = "/ndn";
-  ret_val = ndn_name_from_string(&home_prefix, home_prefix_str, sizeof(home_prefix_str));
+  char home_prefix_str[] = "/ndn";
+  ret_val = ndn_name_from_string(&home_prefix, home_prefix_str, strlen(home_prefix_str));
   if (ret_val != 0) {
     print_error("consumer", "set home prefix", "ndn_name_from_string", ret_val);
     return -1;
