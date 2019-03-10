@@ -60,6 +60,22 @@ int main()
     
     ndn_encoder_t encoder;
     
+    // shared pub and prv keys
+    ndn_key_storage_init();
+    ndn_key_storage_get_empty_ecc_key(&pub_key, &prv_key);
+    ret_val = ndn_ecc_prv_init(prv_key, prv, sizeof(prv),
+                               NDN_ECDSA_CURVE_SECP256R1, 123);
+    if (ret_val != 0) {
+        print_error("_Consumer", "init keys", "ndn_ecc_prv_init", ret_val);
+        return -1;
+    }
+    ret_val = ndn_ecc_pub_init(pub_key, pub, sizeof(pub),
+                               NDN_ECDSA_CURVE_SECP256R1, 456);
+    if (ret_val != 0) {
+        print_error("_Consumer", "init keys", "ndn_ecc_pub_init", ret_val);
+        return -1;
+    }
+    
     // set home prefix
     ndn_name_t home_prefix;
     char* home_prefix_str = "/ndn";
@@ -82,22 +98,7 @@ int main()
     
     // intialization
     ret_val = ndn_direct_face_register_prefix(comp_consumer, on_advertisement);
-    
-    // shared pub and prv keys
-    ndn_key_storage_init();
-    ndn_key_storage_get_empty_ecc_key(&pub_key, &prv_key);
-    ret_val = ndn_ecc_prv_init(prv_key, prv, sizeof(prv),
-                               NDN_ECDSA_CURVE_SECP256R1, 123);
-    if (ret_val != 0) {
-        print_error("_Consumer", "init keys", "ndn_ecc_prv_init", ret_val);
-        return -1;
-    }
-    ret_val = ndn_ecc_pub_init(pub_key, pub, sizeof(pub),
-                               NDN_ECDSA_CURVE_SECP256R1, 456);
-    if (ret_val != 0) {
-        print_error("_Consumer", "init keys", "ndn_ecc_pub_init", ret_val);
-        return -1;
-    }
+  
 
     //adding FIB entry
     ndn_name_t name;
