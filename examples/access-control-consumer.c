@@ -44,9 +44,12 @@ uint8_t receiving_buff[4096] = {0};
 ndn_udp_multicast_face_t* udp_face;
 uint8_t buffer[4096];
 
+const char service_need[] = "print";
+
 enum ASYNC_STEPS{
   ASYNC_STEP_BEFORE_TIME = 0,
   ASYNC_STEP_AFTER_TIME = 1,
+  ASYNC_STEP_SERVICE_FOUND = 2,
 } g_step;
 
 int
@@ -260,16 +263,73 @@ main(int argc, char *argv[])
                                    interest_encoder.offset, on_data, NULL);
 
   int count = 0;
+  int service_number;
+  ndn_sd_identity_t* entry;
   while (true) {
     ndn_udp_multicast_face_recv(udp_face);
-    usleep(10);
+    usleep(10 * 1000);
     count ++;
 
     if(g_step == ASYNC_STEP_BEFORE_TIME){
       // Before time is done
       count = 0;
-    }else if(g_step == ASYNC_STEP_AFTER_TIME){
-      // After time is done, discover service every 1000
+    }
+    if(g_step == ASYNC_STEP_AFTER_TIME){
+      // After time is done, discover service every 1 sec
+      if(count % 100 == 0){
+        count = 0;
+        
+        service_number = -1;
+        ndn_sd_context_t *sd_context = ndn_sd_get_sd_context();
+        for (int i = 0; i < NDN_APPSUPPORT_NEIGHBORS_SIZE; ++i) {
+            if (sd_context->neighbors[i].identity.size == NDN_FWD_INVALID_NAME_COMPONENT_SIZE) {
+                continue;
+            }
+            entry = &sd_context->neighbors[i];
+            printf("Service Provider Found: ");
+            for (uint8_t i = 0; i < entry->identity.size; i++)
+                printf("%c", (char)entry->identity.value[i]);
+            printf("\n");
+            
+            for (int i = 0; i < NDN_APPSUPPORT_SERVICES_SIZE; ++i) {
+                if (entry->services[i].id_size == -1) continue;
+                if (strcmp(service_need, entry->services[i].id_value) == 0)
+                    service_number = i;
+            }
+        }
+        if (service_number != -1){
+          g_step = ASYNC_STEP_SERVICE_FOUND;
+          puts("Consumer: Print service found!");
+        }
+      }
+    }
+    if(g_step == ASYNC_STEP_SERVICE_FOUND){
+      // Send out print interest every 100 secs and try
+      if(count % 100 == 0){
+        count = 0;
+
+        ndn_name_t name_prefix;
+        ndn_encoder_t encoder;
+        char name_string[] = "/ndn/SD/Yu/print/(3+5)*2-6";
+        if(ndn_name_from_string(&name_prefix, name_string, strlen(name_string)) != NDN_SUCCESS){
+            fprintf(stderr, "ERROR: wrong name.\n");
+            return -1;
+        }
+        ndn_interest_from_name(&interest, &name_prefix);
+        encoder_init(&encoder, buffer, 4096);
+        ret_val = ndn_signed_interest_ecdsa_sign(&interest, &component_consumer, prv_key);
+        if (ret_val != 0) {
+            printf("ERROR: ndn_signed_interest_ecdsa_sign (%d)\n", ret_val);
+            return ret_val;
+        }
+        ret_val = ndn_interest_tlv_encode(&encoder, &interest);
+        if (ret_val != 0) {
+            printf("ERROR: ndn_interest_tlv_encode (%d)\n", ret_val);
+            return ret_val;
+        }
+
+        ndn_direct_face_express_interest(&interest.name, encoder.output_value, encoder.offset, NULL, NULL);
+      }
     }
   }
 
