@@ -144,6 +144,7 @@ on_time_interest(const uint8_t* interest, uint32_t interest_size)
   char data_string[32];
 
   struct tm *current_time = localtime(&(tv.tv_sec));
+  memset(data_string, 0, sizeof(data_string));
   strftime(data_string, sizeof(data_string), "the time is %H:%M:%S\n", current_time);
 
   ndn_data_t data;
@@ -154,7 +155,7 @@ on_time_interest(const uint8_t* interest, uint32_t interest_size)
     char keyid_string[] = "/ndn/SD/erynn/time/KEY/100";
     ndn_name_t keyid;
     ret_val = ndn_name_from_string(&keyid, keyid_string, sizeof(keyid_string));
-    ret_val = ndn_data_set_encrypted_content(&data, (uint8_t*)data_string, sizeof(data_string),
+    ret_val = ndn_data_set_encrypted_content(&data, (uint8_t*)data_string, 32,
                                              &keyid, iv, aes_key);
     if (ret_val != 0) {
       print_error("producer", "encrypt content", "ndn_data_set_encrypted_content", ret_val);
