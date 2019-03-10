@@ -75,36 +75,6 @@ print_error(const char *test_name, const char *fnct_name, const char *funct_fail
 }
 
 int
-on_data(const uint8_t* data, uint32_t data_size)
-{
-  printf("Get DK Data\n");
-
-  // parse response Data
-  ndn_data_t response;
-  int ret_val = ndn_data_tlv_decode_ecdsa_verify(&response, data, data_size, pub_key);
-  if (ret_val != 0) {
-    print_error("producer", "on_data", "ndn_data_tlv_decode_ecdsa_verify", ret_val);
-  }
-
-  // update ac state
-  ret_val = ndn_ac_on_ek_response_process(&response);
-  if (ret_val != 0) {
-    print_error("producer", "on_data", "ndn_ac_on_ek_response", ret_val);
-  }
-
-  send_time_request();
-
-  count = 0;
-  while (count < 10000) {
-    ndn_udp_multicast_face_recv(udp_face);
-    usleep(10);
-    count++;
-  }
-
-  return 0;
-}
-
-int
 on_time_data(const uint8_t* data, uint32_t data_size)
 {
   printf("data:\n");
@@ -168,6 +138,27 @@ send_time_request()
                                    on_time_data, NULL);
 }
 
+int
+on_data(const uint8_t* data, uint32_t data_size)
+{
+  printf("Get DK Data\n");
+
+  // parse response Data
+  ndn_data_t response;
+  int ret_val = ndn_data_tlv_decode_ecdsa_verify(&response, data, data_size, pub_key);
+  if (ret_val != 0) {
+    print_error("producer", "on_data", "ndn_data_tlv_decode_ecdsa_verify", ret_val);
+  }
+
+  // update ac state
+  ret_val = ndn_ac_on_ek_response_process(&response);
+  if (ret_val != 0) {
+    print_error("producer", "on_data", "ndn_ac_on_ek_response", ret_val);
+  }
+
+  send_time_request();
+  return 0;
+}
 
 int
 main(int argc, char *argv[])
