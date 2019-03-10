@@ -18,6 +18,7 @@
 #include "adaptation/udp-unicast/ndn-udp-unicast-face.h"
 #include "ndn-lite/face/direct-face.h"
 
+
 ndn_ecc_pub_t* pub_key = NULL;
 ndn_ecc_prv_t* prv_key = NULL;
 
@@ -40,14 +41,14 @@ const uint8_t pub[] = {
 
 ndn_udp_unicast_face_t *face;
 
-int on_advertisement(const uint8_t* rawdata, uint32_t data_size){
+int on_advertisement(const uint8_t* interest, uint32_t interest_size){
     ndn_interest_t decoded_interest;
-    int ret_val = ndn_interest_from_block(&decoded_interest, rawdata, data_size);
+    int ret_val = ndn_interest_from_block(&decoded_interest, interest, interest_size);
     if (ret_val != 0) {
         printf("ERROR: ndn_interest_from_block (%d)\n", ret_val);
         return ret_val;
     }
-    
+    printf("OnAdvertisement\n");
     ndn_sd_on_advertisement_process(&decoded_interest);
     
     return NDN_SUCCESS;
@@ -61,7 +62,7 @@ int on_query_response(const uint8_t* rawdata, uint32_t data_size){
         printf("ERROR: ndn_data_tlv_decode_ecdsa_verify (%d)\n", ret_val);
         return ret_val;
     }
-    
+    printf("OnQueryResponse\n");
     ndn_sd_on_query_response_process(&data);
     
     return NDN_SUCCESS;
@@ -73,6 +74,7 @@ int main()
 
     // tests start
     ndn_security_init();
+    ndn_forwarder_init();
     
     ndn_encoder_t encoder;
     
@@ -104,17 +106,28 @@ int main()
     // set consumer components
     char comp_consumer[] = "/ndn/consumer";
     ndn_name_t component_consumer;
+    name_component_t consumer_compo;
+    name_component_from_string(&consumer_compo, comp_consumer, strlen(comp_consumer));
     ret_val = ndn_name_from_string(&component_consumer, comp_consumer, strlen(comp_consumer));
     if (ret_val != 0) {
         printf("ERROR: name_component_from_string (%d)\n", ret_val);
         return ret_val;
     }
     
+    ndn_sd_init(&home_prefix, &consumer_compo);
+
     face = ndn_udp_unicast_face_construct(1, INADDR_ANY, 6000, htonl(INADDR_LOOPBACK), 5000);
     ndn_direct_face_construct(2);
 
     // intialization
-    ret_val = ndn_direct_face_register_prefix(&component_consumer, on_advertisement);
+    char *prefix_sdadv = "/ndn/SD-ADV";
+    ndn_name_t name_sdadv;
+    ndn_name_from_string(&name_sdadv, prefix_sdadv, strlen(prefix_sdadv));
+    ret_val = ndn_direct_face_register_prefix(&name_sdadv, on_advertisement);
+    if (ret_val != 0) {
+        printf("ERROR: ndn_direct_face_register_prefix (%d)\n", ret_val);
+        return ret_val;
+    }
   
 
     //adding FIB entry
@@ -123,7 +136,7 @@ int main()
     ndn_forwarder_fib_insert(&name, &face->intf, 0);
     
     //find the print service
-    char service_need[] = "/ndn/SD/Yu/print";
+    char service_need[] = "print";
     //int service_size = sizeof(service_need);
     ndn_sd_identity_t* entry;
     
@@ -134,11 +147,12 @@ int main()
         memset(buffer, 0, sizeof(buffer));
         encoder_init(&encoder, buffer, sizeof(buffer));
         service_number = -1;
+        ndn_sd_context_t *sd_context = ndn_sd_get_sd_context();
         for (int i = 0; i < NDN_APPSUPPORT_NEIGHBORS_SIZE; ++i) {
-            if (sd_context.neighbors[i].identity.size == NDN_FWD_INVALID_NAME_COMPONENT_SIZE) {
-                    continue;
-                }
-            entry = &sd_context.neighbors[i];
+            if (sd_context->neighbors[i].identity.size == NDN_FWD_INVALID_NAME_COMPONENT_SIZE) {
+                continue;
+            }
+            entry = &sd_context->neighbors[i];
             printf("Service Provider Found: ");
             for (uint8_t i = 0; i < entry->identity.size; i++)
                 printf("%c", (char)entry->identity.value[i]);
@@ -151,7 +165,13 @@ int main()
             }
         }
         if (service_number != -1) break;
-        usleep(1000);
+        //usleep(1000);
+        
+        int i = 0;
+        for(i = 0; i < 100; i ++){
+            ndn_udp_unicast_face_recv(face);
+            usleep(10 * 1000);
+        }
     }
     puts("Consumer: Print service found!");
     
@@ -165,11 +185,17 @@ int main()
         ndn_sd_prepare_query(&query, &entry->identity, &entry->services[service_number],
                          NULL, 0);
         encoder_init(&encoder, buffer, 1024);
-        ret_val = ndn_signed_interest_ecdsa_sign(&query, &consumer_identity, prv_key);
+        ret_val = ndn_signed_interest_ecdsa_sign(&query, &component_consumer, prv_key);
         ret_val = ndn_interest_tlv_encode(&encoder, &query);
         ndn_direct_face_express_interest(&query.name, encoder.output_value, encoder.offset, on_query_response, NULL);
         puts("Query");
-        usleep(1000);
+        //usleep(1000);
+
+        int i = 0;
+        for(i = 0; i < 100; i ++){
+            ndn_udp_unicast_face_recv(face);
+            usleep(10);
+        }
     }
     puts("Available now!");
     
@@ -184,7 +210,7 @@ int main()
     }
     ndn_interest_from_name(&interest, &name_prefix);
     encoder_init(&encoder, buf, 4096);
-    ret_val = ndn_signed_interest_ecdsa_sign(&interest, &consumer_identity, prv_key);
+    ret_val = ndn_signed_interest_ecdsa_sign(&interest, &component_consumer, prv_key);
     if (ret_val != 0) {
         printf("ERROR: ndn_signed_interest_ecdsa_sign (%d)\n", ret_val);
         return ret_val;
@@ -202,7 +228,7 @@ int main()
     }
     printf("\n");
     
-    ndn_direct_face_express_interest(&name_prefix, encoder.output_value, encoder.offset, NULL, NULL);
+    ndn_direct_face_express_interest(&interest.name, encoder.output_value, encoder.offset, NULL, NULL);
 
     while(1){
         ndn_udp_unicast_face_recv(face);

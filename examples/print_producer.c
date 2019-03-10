@@ -86,6 +86,7 @@ int main()
 
     // tests start
     ndn_security_init();
+    ndn_forwarder_init();
     
     // intiate private and public key
     ndn_encoder_t encoder;
@@ -93,12 +94,12 @@ int main()
     // set home prefix
     ndn_name_t home_prefix;
     char* home_prefix_str = "/ndn";
-    ndn_name_from_string(&home_prefix, home_prefix_str, sizeof(home_prefix_str));
+    ndn_name_from_string(&home_prefix, home_prefix_str, strlen(home_prefix_str));
     
     // set producer components
-    char comp_producer[] = "/ndn/producer";
+    char comp_producer[] = "Yu";
     name_component_t component_producer;
-    name_component_from_string(&component_producer, comp_producer, sizeof(comp_producer));
+    name_component_from_string(&component_producer, comp_producer, strlen(comp_producer));
     
     
     ndn_interest_t interest;
@@ -107,9 +108,9 @@ int main()
     
     // intialization
     ndn_sd_init(&home_prefix, &component_producer);
-    char NDN_SD_PRINT[] = "/SD-ADV/Yu/print";
+    char NDN_SD_PRINT[] = "print";
     ndn_service_t* print_service = ndn_sd_register_get_self_service(NDN_SD_PRINT,
-                                                                      sizeof(NDN_SD_PRINT));
+                                                                    strlen(NDN_SD_PRINT));
     
     // set service status
     ndn_sd_set_service_status(print_service, NDN_APPSUPPORT_SERVICE_AVAILABLE);
@@ -135,7 +136,7 @@ int main()
 
     
     // generate advertisement Interest
-    encoder_init(&encoder, buffer, sizeof(buffer));
+    encoder_init(&encoder, buffer, 1024);
     ndn_sd_prepare_advertisement(&interest);
     printf("Advertisement Preparation Success\n");
     ret_val = ndn_interest_tlv_encode(&encoder, &interest);
@@ -165,9 +166,10 @@ int main()
     //periodically sending advertisement interest
     while (1) {
         ndn_direct_face_express_interest(&interest.name, encoder.output_value, encoder.offset, NULL, NULL);
-        for (int i = 0; i < 1000; ++i) {
+        //for (int i = 0; i < 1000; ++i) {
+        for (int i = 0; i < 200; ++i) {
             ndn_udp_unicast_face_recv(face);
-            usleep(10);
+            usleep(10 * 1000);
         }
     }
     
