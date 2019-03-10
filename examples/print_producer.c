@@ -18,7 +18,7 @@
 #include "ndn-lite/security/ndn-lite-ecc.h"
 #include "ndn-lite/ndn-services.h"
 #include "ndn-lite/encode/key-storage.h"
-#include "adaptation/udp-unicast/ndn-udp-unicast-face.h"
+#include "adaptation/udp-multicast/ndn-udp-multicast-face.h"
 #include "ndn-lite/face/direct-face.h"
 
 #include "yu-prnt-cmd-chk.h"
@@ -40,7 +40,7 @@ const uint8_t pub[] = {
     0xE8, 0xBA, 0x21, 0x89
 };
 
-ndn_udp_unicast_face_t *face;
+ndn_udp_multicast_face_t *face;
 uint8_t buf[4096];
 
 int computation(char *s , int l , int r)
@@ -198,7 +198,7 @@ int main()
     }
     
     // TODO: Use unicast for debugging
-    face = ndn_udp_unicast_face_construct(1, INADDR_ANY, 5000, htonl(INADDR_LOOPBACK), 6000);
+    face = ndn_udp_multicast_face_construct(1, INADDR_ANY, 6363, inet_addr("225.0.0.37"));
     ndn_direct_face_construct(2);
     
     //adding FIB entry
@@ -220,7 +220,7 @@ int main()
         ndn_direct_face_express_interest(&interest.name, encoder.output_value, encoder.offset, NULL, NULL);
         //for (int i = 0; i < 1000; ++i) {
         for (int i = 0; i < 200; ++i) {
-            ndn_udp_unicast_face_recv(face);
+            ndn_udp_multicast_face_recv(face);
             usleep(10 * 1000);
         }
     }
