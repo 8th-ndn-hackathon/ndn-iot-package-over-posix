@@ -12,10 +12,12 @@
 #include "ndn-lite/forwarder/forwarder.h"
 #include "ndn-lite/face/direct-face.h"
 #include "adaptation/udp-multicast/ndn-udp-multicast-face.h"
+#include "ndn-lite/app-support/service-discovery.h"
 #include <netdb.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <arpa/inet.h>
 
 const uint8_t prv[] = {
   0x5D, 0xC7, 0x6B, 0xAB, 0xEE, 0xD4, 0xEB, 0xB7, 0xBA, 0xFC,
@@ -41,6 +43,11 @@ in_addr_t multicast_ip;
 uint8_t receiving_buff[4096] = {0};
 ndn_udp_multicast_face_t* udp_face;
 uint8_t buffer[4096];
+
+enum ASYNC_STEPS{
+  ASYNC_STEP_BEFORE_TIME = 0,
+  ASYNC_STEP_AFTER_TIME = 1,
+} g_step;
 
 int
 parseArgs(int argc, char *argv[]) {
@@ -96,12 +103,40 @@ on_time_data(const uint8_t* data, uint32_t data_size)
   ndn_data_t response;
   int ret_val = ndn_data_tlv_decode_digest_verify(&response, data, data_size);
   if (ret_val != 0) {
-    printf("producer", "on_data", "ndn_data_tlv_decode_digest_verify", ret_val);
+    printf("producer %s %s %d\n", "on_data", "ndn_data_tlv_decode_digest_verify", ret_val);
   }
 
   printf("The current time is: %s\n", response.content_value);
+  g_step = ASYNC_STEP_AFTER_TIME;
 
   return 0;
+}
+
+int on_advertisement(const uint8_t* interest, uint32_t interest_size){
+    ndn_interest_t decoded_interest;
+    int ret_val = ndn_interest_from_block(&decoded_interest, interest, interest_size);
+    if (ret_val != 0) {
+        printf("ERROR: ndn_interest_from_block (%d)\n", ret_val);
+        return ret_val;
+    }
+    printf("OnAdvertisement\n");
+    ndn_sd_on_advertisement_process(&decoded_interest);
+    
+    return NDN_SUCCESS;
+}
+
+int on_query_response(const uint8_t* rawdata, uint32_t data_size){
+    ndn_data_t data;
+    
+    int ret_val = ndn_data_tlv_decode_ecdsa_verify(&data, rawdata, data_size, pub_key);
+    if (ret_val != 0) {
+        printf("ERROR: ndn_data_tlv_decode_ecdsa_verify (%d)\n", ret_val);
+        return ret_val;
+    }
+    printf("OnQueryResponse\n");
+    ndn_sd_on_query_response_process(&data);
+    
+    return NDN_SUCCESS;
 }
 
 void
@@ -132,6 +167,8 @@ main(int argc, char *argv[])
   if ((ret_val = parseArgs(argc, argv)) != 0) {
     return ret_val;
   }
+
+  g_step = ASYNC_STEP_BEFORE_TIME;
 
   // init security
   ndn_security_init();
@@ -181,6 +218,9 @@ main(int argc, char *argv[])
 
   // set up direct face and forwarder
   ndn_forwarder_init();
+
+  ndn_sd_init(&home_prefix, &component_consumer);
+
   ndn_direct_face_construct(666);
 
   // add routes to the network
@@ -192,6 +232,16 @@ main(int argc, char *argv[])
     print_error("consumer", "add routes", "ndn_name_from_string", ret_val);
   }
   ndn_forwarder_fib_insert(&prefix, &udp_face->intf, 0);
+
+  // Register prefix for SD-ADV
+  char *prefix_sdadv = "/ndn/SD-ADV";
+  ndn_name_t name_sdadv;
+  ndn_name_from_string(&name_sdadv, prefix_sdadv, strlen(prefix_sdadv));
+  ret_val = ndn_direct_face_register_prefix(&name_sdadv, on_advertisement);
+  if (ret_val != 0) {
+      printf("ERROR: ndn_direct_face_register_prefix (%d)\n", ret_val);
+      return ret_val;
+  }
 
   // prepare DK Interest for AC
   ndn_encoder_t interest_encoder;
@@ -210,10 +260,17 @@ main(int argc, char *argv[])
                                    interest_encoder.offset, on_data, NULL);
 
   int count = 0;
-  while (count < 10000) {
+  while (true) {
     ndn_udp_multicast_face_recv(udp_face);
     usleep(10);
-    count++;
+    count ++;
+
+    if(g_step == ASYNC_STEP_BEFORE_TIME){
+      // Before time is done
+      count = 0;
+    }else if(g_step == ASYNC_STEP_AFTER_TIME){
+      // After time is done, discover service every 1000
+    }
   }
 
   send_time_request();
