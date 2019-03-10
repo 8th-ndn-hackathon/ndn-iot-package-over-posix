@@ -11,6 +11,7 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <netinet/in.h>
 
 int
 ndn_udp_multicast_face_up(struct ndn_face_intf* self);
@@ -68,7 +69,7 @@ ndn_udp_multicast_face_up(struct ndn_face_intf* self)
 {
   ndn_udp_multicast_face_t* ptr = (ndn_udp_multicast_face_t*)self;
   int iyes = 1;
-  u_char ttl = 5;
+  uint8_t ttl = 5;
   struct ip_mreq mreq;
 
   if(self->state == NDN_FACE_STATE_UP){
