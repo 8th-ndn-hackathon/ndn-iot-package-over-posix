@@ -39,6 +39,8 @@ ndn_ecc_prv_t* prv_key = NULL;
 char* defaultaddr = "225.0.0.37";
 in_addr_t multicast_ip;
 uint8_t receiving_buff[4096] = {0};
+ndn_udp_multicast_face_t* udp_face;
+uint8_t buffer[4096];
 
 int
 parseArgs(int argc, char *argv[]) {
@@ -85,6 +87,43 @@ on_data(const uint8_t* data, uint32_t data_size)
 
   return 0;
 }
+
+int
+on_time_data(const uint8_t* data, uint32_t data_size)
+{
+  printf("data:\n");
+  // parse response Data
+  ndn_data_t response;
+  int ret_val = ndn_data_tlv_decode_digest_verify(&response, data, data_size);
+  if (ret_val != 0) {
+    printf("producer", "on_data", "ndn_data_tlv_decode_digest_verify", ret_val);
+  }
+
+  printf("The current time is: %s\n", response.content_value);
+
+  return 0;
+}
+
+void
+send_time_request()
+{
+  ndn_name_t interest_name;
+  char interest_name_str[] = "/ndn/SD/erynn/time/now";
+  int ret_val = ndn_name_from_string(&interest_name, interest_name_str, strlen(interest_name_str));
+
+  ndn_interest_t interest;
+  ndn_interest_from_name(&interest, &interest_name);
+  ndn_encoder_t encoder;
+  encoder_init(&encoder, buffer, 4096);
+
+  //construct interest without signature
+  ndn_interest_tlv_encode(&encoder, &interest);
+
+  //send interest
+  ndn_direct_face_express_interest(&interest_name, encoder.output_value, encoder.offset,
+                                   on_time_data, NULL);
+}
+
 
 int
 main(int argc, char *argv[])
@@ -140,33 +179,21 @@ main(int argc, char *argv[])
   // init ac state
   ndn_ac_state_init(&consumer_identity, pub_key, prv_key);
 
-
   // set up direct face and forwarder
   ndn_forwarder_init();
   ndn_direct_face_construct(666);
 
-  // add routes
-  ndn_udp_multicast_face_t* udp_face;
+  // add routes to the network
   udp_face = ndn_udp_multicast_face_construct(667, INADDR_ANY, 6363, multicast_ip);
-
-  char controller_prefix_string[] = "/ndn/AC";
-  ndn_name_t controller_prefix;
-  ret_val = ndn_name_from_string(&controller_prefix, controller_prefix_string, sizeof(controller_prefix_string));
+  char prefix_string[] = "/ndn";
+  ndn_name_t prefix;
+  ret_val = ndn_name_from_string(&prefix, prefix_string, sizeof(prefix_string));
   if (ret_val != 0) {
     print_error("consumer", "add routes", "ndn_name_from_string", ret_val);
   }
-  ndn_forwarder_fib_insert(&controller_prefix, &udp_face->intf, 0);
+  ndn_forwarder_fib_insert(&prefix, &udp_face->intf, 0);
 
-  char producer_prefix_string[] = "/ndn/producer";
-  ndn_name_t producer_prefix;
-  ret_val = ndn_name_from_string(&producer_prefix, producer_prefix_string, sizeof(producer_prefix_string));
-  if (ret_val != 0) {
-    print_error("consumer", "add routes", "ndn_name_from_string", ret_val);
-  }
-  ndn_forwarder_fib_insert(&producer_prefix, &udp_face->intf, 0);
-
-  // prepare DK Interest
-  uint8_t buffer[1024];
+  // prepare DK Interest for AC
   ndn_encoder_t interest_encoder;
   encoder_init(&interest_encoder, buffer, sizeof(buffer));
   ret_val = ndn_ac_prepare_key_request_interest(&interest_encoder, &home_prefix,
@@ -176,7 +203,7 @@ main(int argc, char *argv[])
     return -1;
   }
 
-  // send out Interest
+  // send out Interest to the AC controller
   ndn_interest_t interest;
   ndn_interest_from_block(&interest, interest_encoder.output_value, interest_encoder.offset);
   ndn_direct_face_express_interest(&interest.name, interest_encoder.output_value,
@@ -188,5 +215,8 @@ main(int argc, char *argv[])
     usleep(10);
     count++;
   }
+
+  send_time_request();
+
   return 0;
 }
