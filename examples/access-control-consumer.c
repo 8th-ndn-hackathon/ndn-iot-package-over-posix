@@ -56,17 +56,7 @@ parseArgs(int argc, char *argv[]) {
     return 1;
   }
 
-  host_addr = gethostbyname(sz_addr);
-  if(host_addr == NULL){
-    fprintf(stderr, "ERROR: wrong hostname.\n");
-    return 2;
-  }
-  paddrs = (struct in_addr **)host_addr->h_addr_list;
-  if(paddrs[0] == NULL){
-    fprintf(stderr, "ERROR: wrong hostname.\n");
-    return 2;
-  }
-  multicast_ip = paddrs[0]->s_addr;
+  multicast_ip = inet_addr(sz_addr);
   return 0;
 }
 
@@ -191,6 +181,11 @@ main(int argc, char *argv[])
   ndn_direct_face_express_interest(&controller_prefix, interest_encoder.output_value,
                                    interest_encoder.offset, on_data, NULL);
 
-
+  int count = 0;
+  while (count < 10000) {
+    ndn_udp_multicast_face_recv(udp_face);
+    usleep(10);
+    count++;
+  }
   return 0;
 }

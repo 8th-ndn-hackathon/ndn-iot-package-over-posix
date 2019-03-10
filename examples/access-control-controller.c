@@ -59,17 +59,7 @@ parseArgs(int argc, char *argv[]) {
     return 1;
   }
 
-  host_addr = gethostbyname(sz_addr);
-  if(host_addr == NULL){
-    fprintf(stderr, "ERROR: wrong hostname.\n");
-    return 2;
-  }
-  paddrs = (struct in_addr **)host_addr->h_addr_list;
-  if(paddrs[0] == NULL){
-    fprintf(stderr, "ERROR: wrong hostname.\n");
-    return 2;
-  }
-  multicast_ip = paddrs[0]->s_addr;
+  multicast_ip = inet_addr(sz_addr);
   return 0;
 }
 
