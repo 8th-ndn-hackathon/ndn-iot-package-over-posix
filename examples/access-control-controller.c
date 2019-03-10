@@ -38,7 +38,7 @@ ndn_ecc_pub_t* pub_key = NULL;
 ndn_ecc_prv_t* prv_key = NULL;
 char defaultaddr[] = "225.0.0.37";
 in_addr_t multicast_ip;
-ndn_udp_multicast_face_t* udp_face;
+ndn_udp_multicast_face_t* udp_face = NULL;
 
 ndn_name_t controller_identity;
 ndn_interest_t ek_interest;
@@ -73,14 +73,19 @@ on_interest(const uint8_t* interest, uint32_t interest_size)
 {
   // parse incoming Interest
   printf("Get EK/DK Interest\n");
+  ndn_interest_init(&ek_interest);
   int ret_val = ndn_interest_from_block(&ek_interest, interest, interest_size);
+  printf("are");
   if (ret_val != 0) {
     print_error("controller", "on_EKInterest", "ndn_interest_from_block", ret_val);
   }
   ret_val = ndn_signed_interest_ecdsa_verify(&ek_interest, pub_key);
+  printf("u");
   if (ret_val != 0) {
     print_error("controller", "on_EKInterest", "ndn_signed_interest_ecdsa_verify", ret_val);
   }
+
+  printf("11111");
 
   // react on the Interest
   ndn_data_t response;
@@ -89,16 +94,18 @@ on_interest(const uint8_t* interest, uint32_t interest_size)
     print_error("controller", "on_EKInterest", "ndn_ac_on_interest_process", ret_val);
   }
 
+  printf("222222");
+
   // reply the Data packet
   ndn_encoder_t encoder;
   ret_val = ndn_data_tlv_encode_ecdsa_sign(&encoder, &response, &controller_identity,
                                            prv_key);
 
+  printf("333333");
+
   ndn_forwarder_on_incoming_data(ndn_forwarder_get_instance(),
                                  &udp_face->intf,
-                                 &response.name,
-                                 encoder.output_value,
-                                 encoder.offset);
+                                 NULL, encoder.output_value, encoder.offset);
   return 0;
 }
 
@@ -115,7 +122,7 @@ main(int argc, char *argv[])
 
   // set home prefix
   ndn_name_t home_prefix;
-  char* home_prefix_str = "/ndn";
+  char home_prefix_str[] = "/ndn";
   ret_val = ndn_name_from_string(&home_prefix, home_prefix_str, sizeof(home_prefix_str));
   if (ret_val != 0) {
     print_error("controller", "set home prefix", "ndn_name_from_string", ret_val);
