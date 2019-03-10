@@ -45,9 +45,8 @@ parseArgs(int argc, char *argv[]) {
   struct hostent *host_addr;
   struct in_addr **paddrs;
 
-  if (argc < 1) {
+  if (argc < 2) {
     sz_addr = defaultaddr;
-    return 1;
   }
   else
     sz_addr = argv[1];
