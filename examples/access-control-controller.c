@@ -39,6 +39,7 @@ ndn_ecc_prv_t* prv_key = NULL;
 char defaultaddr[] = "225.0.0.37";
 in_addr_t multicast_ip;
 ndn_udp_multicast_face_t* udp_face = NULL;
+uint8_t receiving_buff[4096] = {0};
 
 ndn_name_t controller_identity;
 ndn_interest_t ek_interest;
@@ -75,17 +76,13 @@ on_interest(const uint8_t* interest, uint32_t interest_size)
   printf("Get EK/DK Interest\n");
   ndn_interest_init(&ek_interest);
   int ret_val = ndn_interest_from_block(&ek_interest, interest, interest_size);
-  printf("are");
   if (ret_val != 0) {
     print_error("controller", "on_EKInterest", "ndn_interest_from_block", ret_val);
   }
   ret_val = ndn_signed_interest_ecdsa_verify(&ek_interest, pub_key);
-  printf("u");
   if (ret_val != 0) {
     print_error("controller", "on_EKInterest", "ndn_signed_interest_ecdsa_verify", ret_val);
   }
-
-  printf("11111");
 
   // react on the Interest
   ndn_data_t response;
@@ -94,14 +91,11 @@ on_interest(const uint8_t* interest, uint32_t interest_size)
     print_error("controller", "on_EKInterest", "ndn_ac_on_interest_process", ret_val);
   }
 
-  printf("222222");
-
   // reply the Data packet
   ndn_encoder_t encoder;
+  encoder_init(&encoder, receiving_buff, sizeof(receiving_buff));
   ret_val = ndn_data_tlv_encode_ecdsa_sign(&encoder, &response, &controller_identity,
                                            prv_key);
-
-  printf("333333");
 
   ndn_forwarder_on_incoming_data(ndn_forwarder_get_instance(),
                                  &udp_face->intf,
