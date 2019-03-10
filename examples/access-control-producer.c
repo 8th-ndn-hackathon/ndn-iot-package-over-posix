@@ -165,6 +165,8 @@ main(int argc, char *argv[])
   }
 
   // send out Interest
+  ndn_interest_t interest;
+  ndn_interest_from_block(&interest, interest_encoder.output_value, interest_encoder.offset);
   ndn_direct_face_express_interest(&controller_prefix, interest_encoder.output_value,
                                    interest_encoder.offset, on_data, NULL);
 

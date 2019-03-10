@@ -38,6 +38,7 @@ ndn_ecc_pub_t* pub_key = NULL;
 ndn_ecc_prv_t* prv_key = NULL;
 char* defaultaddr = "225.0.0.37";
 in_addr_t multicast_ip;
+uint8_t receiving_buff[4096] = {0};
 
 int
 parseArgs(int argc, char *argv[]) {
@@ -176,7 +177,9 @@ main(int argc, char *argv[])
   }
 
   // send out Interest
-  ndn_direct_face_express_interest(&controller_prefix, interest_encoder.output_value,
+  ndn_interest_t interest;
+  ndn_interest_from_block(&interest, interest_encoder.output_value, interest_encoder.offset);
+  ndn_direct_face_express_interest(&interest.name, interest_encoder.output_value,
                                    interest_encoder.offset, on_data, NULL);
 
   int count = 0;
