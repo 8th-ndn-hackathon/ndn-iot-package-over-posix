@@ -90,7 +90,7 @@ int on_interest(const uint8_t* interest, uint32_t interest_size){
         return ret_val;
     }
     name_component_t command = decoded_interest.name.components[3];
-    parsing(s , strlen(s));
+    parsing(command , strlen(command));
     return NDN_SUCCESS;
 }
 
