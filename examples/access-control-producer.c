@@ -36,6 +36,7 @@ const uint8_t pub[] = {
 
 ndn_ecc_pub_t* pub_key = NULL;
 ndn_ecc_prv_t* prv_key = NULL;
+char defaultaddr[] = "225.0.0.37";
 in_addr_t multicast_ip;
 
 int
@@ -45,7 +46,6 @@ parseArgs(int argc, char *argv[]) {
   struct in_addr **paddrs;
 
   if (argc < 1) {
-    char defaultaddr[] = "225.0.0.37";
     sz_addr = defaultaddr;
     return 1;
   }
@@ -165,8 +165,8 @@ main(int argc, char *argv[])
   // set up direct face and forwarder
   ndn_forwarder_init();
   ndn_direct_face_construct(666);
-  ndn_udp_muticast_face_t* udp_face;
-  udp_face = ndn_udp_muticast_face_construct(667, INADDR_ANY, 6363, multicast_ip);
+  ndn_udp_multicast_face_t* udp_face;
+  udp_face = ndn_udp_multicast_face_construct(667, INADDR_ANY, 6363, multicast_ip);
 
   // add route
   char prefix_string[] = "/ndn/AC";
@@ -175,10 +175,10 @@ main(int argc, char *argv[])
   if (ret_val != 0) {
     print_error("consumer", "add route", "ndn_name_from_string", ret_val);
   }
-  ndn_forwarder_fib_insert(&controller_prefix, udp_face, 0);
+  ndn_forwarder_fib_insert(&controller_prefix, &udp_face->intf, 0);
 
-  while (running) {
-    ndn_udp_multicast_face_recv(consumer_udp_face);
+  while (true) {
+    ndn_udp_multicast_face_recv(udp_face);
     usleep(10);
   }
 

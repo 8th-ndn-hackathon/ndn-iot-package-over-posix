@@ -36,6 +36,7 @@ const uint8_t pub[] = {
 
 ndn_ecc_pub_t* pub_key = NULL;
 ndn_ecc_prv_t* prv_key = NULL;
+char* defaultaddr = "225.0.0.37";
 in_addr_t multicast_ip;
 
 int
@@ -44,15 +45,13 @@ parseArgs(int argc, char *argv[]) {
   struct hostent *host_addr;
   struct in_addr **paddrs;
 
-  if (argc < 1) {
-    char defaultaddr[] = "225.0.0.37";
+  if (argc < 2) {
     sz_addr = defaultaddr;
-    return 1;
   }
   else
     sz_addr = argv[1];
 
-  if (strlen(sz_addr) <= 0) {
+  if (sizeof(sz_addr) <= 0) {
     fprintf(stderr, "ERROR: wrong arguments.\n");
     return 1;
   }
@@ -152,6 +151,31 @@ main(int argc, char *argv[])
   // init ac state
   ndn_ac_state_init(&consumer_identity, pub_key, prv_key);
 
+
+  // set up direct face and forwarder
+  ndn_forwarder_init();
+  ndn_direct_face_construct(666);
+
+  // add routes
+  ndn_udp_multicast_face_t* udp_face;
+  udp_face = ndn_udp_multicast_face_construct(667, INADDR_ANY, 6363, multicast_ip);
+
+  char controller_prefix_string[] = "/ndn/AC";
+  ndn_name_t controller_prefix;
+  ret_val = ndn_name_from_string(&controller_prefix, controller_prefix_string, sizeof(controller_prefix_string));
+  if (ret_val != 0) {
+    print_error("consumer", "add routes", "ndn_name_from_string", ret_val);
+  }
+  ndn_forwarder_fib_insert(&controller_prefix, &udp_face->intf, 0);
+
+  char producer_prefix_string[] = "/ndn/producer";
+  ndn_name_t producer_prefix;
+  ret_val = ndn_name_from_string(&producer_prefix, producer_prefix_string, sizeof(producer_prefix_string));
+  if (ret_val != 0) {
+    print_error("consumer", "add routes", "ndn_name_from_string", ret_val);
+  }
+  ndn_forwarder_fib_insert(&producer_prefix, &udp_face->intf, 0);
+
   // prepare DK Interest
   uint8_t buffer[1024];
   ndn_encoder_t interest_encoder;
@@ -163,29 +187,10 @@ main(int argc, char *argv[])
     return -1;
   }
 
-  // set up direct face and forwarder
-  ndn_forwarder_init();
-  ndn_direct_face_construct(666);
+  // send out Interest
+  ndn_direct_face_express_interest(&controller_prefix, interest_encoder.output_value,
+                                   interest_encoder.offset, on_data, NULL);
 
-  // add routes
-  ndn_udp_muticast_face_t* udp_face;
-  udp_face = ndn_udp_muticast_face_construct(667, INADDR_ANY, 6363, multicast_ip);
-
-  char controller_prefix_string[] = "/ndn/AC";
-  ndn_name_t controller_prefix;
-  ret_val = ndn_name_from_string(&controller_prefix, controller_prefix_string, sizeof(controller_prefix_string));
-  if (ret_val != 0) {
-    print_error("consumer", "add routes", "ndn_name_from_string", ret_val);
-  }
-  ndn_forwarder_fib_insert(&controller_prefix, udp_face, 0);
-
-  char producer_prefix_string[] = "/ndn/producer";
-  ndn_name_t producer_prefix;
-  ret_val = ndn_name_from_string(&producer_prefix, producer_prefix_string, sizeof(producer_prefix_string));
-  if (ret_val != 0) {
-    print_error("consumer", "add routes", "ndn_name_from_string", ret_val);
-  }
-  ndn_forwarder_fib_insert(&producer_prefix, udp_face, 0);
 
   return 0;
 }
