@@ -141,10 +141,10 @@ on_time_interest(const uint8_t* interest, uint32_t interest_size)
 
   // send data
   gettimeofday(&tv, NULL);
-  char data_string[50];
+  char data_string[20];
 
   struct tm *current_time = localtime(&(tv.tv_sec));
-  strftime(data_string, 50, "the time is %H:%M:%S\n", current_time);
+  strftime(data_string, sizeof(data_string), "the time is %H:%M:%S\n", current_time);
 
   ndn_data_t data;
   data.name = interest1.name;
@@ -154,7 +154,7 @@ on_time_interest(const uint8_t* interest, uint32_t interest_size)
     char keyid_string[] = "/ndn/SD/erynn/time/KEY/100";
     ndn_name_t keyid;
     ret_val = ndn_name_from_string(&keyid, keyid_string, sizeof(keyid_string));
-    ndn_data_set_encrypted_content(&data, (uint8_t*)data_string, strlen(data_string),
+    ndn_data_set_encrypted_content(&data, (uint8_t*)data_string, sizeof(data_string),
                                    &keyid, iv, aes_key);
   }
   else {
