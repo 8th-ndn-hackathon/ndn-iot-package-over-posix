@@ -11,6 +11,8 @@ set(LIST_EXAMPLES
   "access-control-controller"
   "time-server"
   "time-consumer"
+  "print_consumer"
+  "print_producer"
 )
 foreach(EXAM_NAME IN LISTS LIST_EXAMPLES)
   add_executable(${EXAM_NAME} "${DIR_EXAMPLES}/${EXAM_NAME}.c")
