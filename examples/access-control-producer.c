@@ -16,6 +16,8 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <sys/time.h>
+#include <time.h>
 
 const uint8_t prv[] = {
   0x5D, 0xC7, 0x6B, 0xAB, 0xEE, 0xD4, 0xEB, 0xB7, 0xBA, 0xFC,
@@ -34,10 +36,18 @@ const uint8_t pub[] = {
   0xE8, 0xBA, 0x21, 0x89
 };
 
+const uint8_t iv[] = {
+  0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+  0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f
+};
+
 ndn_ecc_pub_t* pub_key = NULL;
 ndn_ecc_prv_t* prv_key = NULL;
+ndn_aes_key_t* aes_key = NULL;
+uint8_t buffer[4096] = {0};
 char defaultaddr[] = "225.0.0.37";
 in_addr_t multicast_ip;
+ndn_udp_multicast_face_t* udp_face;
 
 int
 parseArgs(int argc, char *argv[]) {
@@ -82,7 +92,83 @@ on_data(const uint8_t* data, uint32_t data_size)
     print_error("producer", "on_data", "ndn_ac_on_ek_response", ret_val);
   }
 
+  // check whether the key is in the key storage
+  ndn_key_storage_get_aes_key(100, &aes_key);
+  if (aes_key == NULL) {
+    print_error("producer", "on_data", "ndn_key_storage_get_aes_key", ret_val);
+  }
   return 0;
+}
+
+int
+on_interest1(const uint8_t* interest, uint32_t interest_size)
+{
+  return 0;
+}
+
+
+int
+on_interest2(const uint8_t* interest, uint32_t interest_size)
+{
+  int ret_val = -1;
+  ndn_data_t data;
+  ndn_encoder_t encoder;
+  struct timeval tv;
+
+  printf("Inside the on_interest function\n");
+
+  ndn_interest_t interest1;
+  ndn_interest_from_block(&interest1, interest, interest_size);
+
+  ndn_name_t name1 = interest1.name;
+
+  for (int i=0; i < name1.components_size; i++) {
+    printf("/%.*s", name1.components[i].size, name1.components[i].value);
+  }
+  printf("\n");
+  printf("components_size: %d\n", name1.components_size);
+
+  printf("is_SignedInterest = %d\n", interest1.is_SignedInterest);
+
+  if (interest1.is_SignedInterest > 0) {
+    if (ndn_signed_interest_digest_verify(&interest1) != 0) {
+      printf("invalid signature.\n");
+      return 1;
+    } else {
+      printf("valid signature.\n");
+    }
+  } else {
+    printf("no signature\n");
+  }
+
+  // send data
+  gettimeofday(&tv, NULL);
+  char data_string[50];
+
+  struct tm *current_time = localtime(&(tv.tv_sec));
+  strftime(data_string, 50, "the time is %H:%M:%S\n", current_time);
+
+  data.name = interest1.name;
+  //ndn_data_set_content(&data, (uint8_t*)&tv, sizeof(struct timeval));
+
+  // encrypt the content
+  char keyid_string[] = "/ndn/SD/erynn/time/KEY/100";
+  ndn_name_t keyid;
+  ret_val = ndn_name_from_string(&keyid, keyid_string, sizeof(keyid_string));
+  ndn_data_set_encrypted_content(&data, (uint8_t*)data_string, strlen(data_string),
+                                 &keyid, iv, aes_key);
+
+
+  // ndn_data_set_content(&data, data_string, strlen(data_string));
+  ndn_metainfo_init(&data.metainfo);
+  ndn_metainfo_set_content_type(&data.metainfo, NDN_CONTENT_TYPE_BLOB);
+  encoder_init(&encoder, buffer, 4096);
+  ndn_data_tlv_encode_digest_sign(&encoder, &data);
+  ndn_forwarder_on_incoming_data(ndn_forwarder_get_instance(),
+                                 &udp_face->intf, &data.name,
+                                 encoder.output_value, encoder.offset);
+
+  return NDN_SUCCESS;
 }
 
 int
@@ -136,16 +222,15 @@ main(int argc, char *argv[])
     return -1;
   }
 
-  // init ac state
+  // init AC state
   ndn_ac_state_init(&producer_identity, pub_key, prv_key);
 
   // set up direct face and forwarder
   ndn_forwarder_init();
   ndn_direct_face_construct(666);
-  ndn_udp_multicast_face_t* udp_face;
   udp_face = ndn_udp_multicast_face_construct(667, INADDR_ANY, 6363, multicast_ip);
 
-  // add route
+  // add route to AC
   char prefix_string[] = "/ndn/AC";
   ndn_name_t controller_prefix;
   ret_val = ndn_name_from_string(&controller_prefix, prefix_string, sizeof(prefix_string));
@@ -154,8 +239,31 @@ main(int argc, char *argv[])
   }
   ndn_forwarder_fib_insert(&controller_prefix, &udp_face->intf, 0);
 
-  // prepare EK Interest
-  uint8_t buffer[1024];
+  // register prefix 1 for SD
+  char prefix1_string[] = "/ndn/SD/erynn/QUERY";
+  ndn_name_t prefix1;
+  ret_val = ndn_name_from_string(&prefix1, prefix1_string, sizeof(prefix1_string));
+  if (ret_val != 0) {
+    print_error("controller", "query register prefix", "ndn_name_from_string", ret_val);
+  }
+  ret_val = ndn_direct_face_register_prefix(&prefix1, on_interest1);
+  if (ret_val != 0) {
+    print_error("controller", "query register prefix", "ndn_direct_face_register_prefix", ret_val);
+  }
+
+  // register prefix 1 for SD
+  char prefix2_string[] = "/ndn/SD/erynn/time";
+  ndn_name_t prefix2;
+  ret_val = ndn_name_from_string(&prefix2, prefix2_string, sizeof(prefix2_string));
+  if (ret_val != 0) {
+    print_error("controller", "time service register prefix", "ndn_name_from_string", ret_val);
+  }
+  ret_val = ndn_direct_face_register_prefix(&prefix2, on_interest2);
+  if (ret_val != 0) {
+    print_error("controller", "time service register prefix", "ndn_direct_face_register_prefix", ret_val);
+  }
+
+  // prepare EK Interest for AC
   ndn_encoder_t interest_encoder;
   encoder_init(&interest_encoder, buffer, sizeof(buffer));
   ret_val = ndn_ac_prepare_key_request_interest(&interest_encoder, &home_prefix, &component_producer,
@@ -164,7 +272,7 @@ main(int argc, char *argv[])
     print_error("producer", "prepare EK Interest", "ndn_ac_prepare_key_request", ret_val);
   }
 
-  // send out Interest
+  // send out Interest to AC controller
   ndn_interest_t interest;
   ndn_interest_from_block(&interest, interest_encoder.output_value, interest_encoder.offset);
   ndn_direct_face_express_interest(&controller_prefix, interest_encoder.output_value,
