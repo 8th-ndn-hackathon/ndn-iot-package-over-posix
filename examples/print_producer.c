@@ -21,6 +21,8 @@
 #include "adaptation/udp-unicast/ndn-udp-unicast-face.h"
 #include "ndn-lite/face/direct-face.h"
 
+#include "yu-prnt-cmd-chk.h"
+
 const uint8_t prv[] = {
     0x5D, 0xC7, 0x6B, 0xAB, 0xEE, 0xD4, 0xEB, 0xB7, 0xBA, 0xFC,
     0x64, 0xE7, 0x8B, 0xDB, 0x22, 0xE1, 0xF4, 0x37, 0x10, 0xC2,
@@ -89,6 +91,15 @@ int on_interest(const uint8_t* interest, uint32_t interest_size){
         printf("ERROR: Unable to decode Interest. (%d)\n", ret_val);
         return ret_val;
     }
+    ndn_ecc_pub_t pub_key;
+    ret_val = ndn_ecc_pub_init(&pub_key, pub, sizeof(pub), NDN_ECDSA_CURVE_SECP256R1, 1234);
+    if (ret_val != 0) {
+      printf("ERROR: Unable to initialize public key object. (%d)\n", ret_val);
+    }
+    ret_val = check_interest(&decoded_interest, &yu_rule, &pub_key);
+    if (ret_val != 0) {
+      printf("ERROR: Failed to validate interest. (%d)\n", ret_val);
+    }
     name_component_t command = decoded_interest.name.components[4];
     parsing(command.value , command.size);
     return NDN_SUCCESS;
@@ -127,6 +138,7 @@ int main()
     // tests start
     ndn_security_init();
     ndn_forwarder_init();
+    init_yu_prnt_cmd_chk();
     
     // intiate private and public key
     ndn_encoder_t encoder;

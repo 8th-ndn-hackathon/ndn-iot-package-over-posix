@@ -104,7 +104,7 @@ int main()
     }
     
     // set consumer components
-    char comp_consumer[] = "/ndn/consumer";
+    char comp_consumer[] = "/ndn/Yu";
     ndn_name_t component_consumer;
     name_component_t consumer_compo;
     name_component_from_string(&consumer_compo, comp_consumer, strlen(comp_consumer));

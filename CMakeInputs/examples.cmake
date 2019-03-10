@@ -21,4 +21,9 @@ foreach(EXAM_NAME IN LISTS LIST_EXAMPLES)
 endforeach()
 unset(LIST_EXAMPLES)
 
+target_sources(print_producer PRIVATE
+  ${DIR_EXAMPLES}/yu-prnt-cmd-chk.c
+  ${DIR_EXAMPLES}/yu-prnt-cmd-chk.h
+)
+
 unset(DIR_EXAMPLES_OUTPUT)
