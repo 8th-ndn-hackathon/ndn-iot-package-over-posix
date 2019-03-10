@@ -41,6 +41,46 @@ const uint8_t pub[] = {
 ndn_udp_unicast_face_t *face;
 uint8_t buf[4096];
 
+int computation(char *s , int l , int r)
+{
+    int count = 0;
+    for (int i = l + 1; i <= r - 1; ++i)
+        if (s[i] == '(' || s[i] == ')') ++count;
+    if (s[l] == '(' && s[r] == ')' && count == 0) return computation(s , l + 1 , r - 1);
+    if (l == r) return s[l] - '0';
+    count = 0;
+    int x , y;
+    for (int i = r; i >= l; --i) {
+        if (s[i] == ')') ++count;
+        if (s[i] == '(') --count;
+        if ((s[i] == '+' || s[i] == '-') && count == 0) {
+            x = computation(s , l , i - 1);
+            y = computation(s , i + 1 , r);
+            if (x == -14257 || y == -14257) return -14257;
+            if (s[i] == '+') return x+y; else return x-y;
+        }
+    }
+    count = 0;
+    for (int i = r; i >= l; --i) {
+        if (s[i] == ')') ++count;
+        if (s[i] == '(') --count;
+        if (s[i] == '*' && count == 0) {
+            x = computation(s , l , i - 1);
+            y = computation(s , i + 1 , r);
+            if (x == -14257 || y == -14257) return -14257;
+            return x*y;
+        }
+    }
+    return -14257;
+}
+
+void parsing(char *s, int size)
+{
+    int res = computation(s , 0 , size - 1);
+    if (res != -14257) printf("%d\n" , computation(s , 0 , size - 1));
+    else puts(s);
+}
+
 int on_interest(const uint8_t* interest, uint32_t interest_size){
     ndn_interest_t decoded_interest;
     int ret_val;
@@ -50,7 +90,7 @@ int on_interest(const uint8_t* interest, uint32_t interest_size){
         return ret_val;
     }
     name_component_t command = decoded_interest.name.components[3];
-    printf("OnInterest: %s\n", command.value);
+    parsing(s , strlen(s));
     return NDN_SUCCESS;
 }
 
