@@ -75,7 +75,7 @@ print_error(const char *test_name, const char *fnct_name, const char *funct_fail
 }
 
 int
-on_data(const uint8_t* data, uint32_t data_size)
+on_ek_data(const uint8_t* data, uint32_t data_size)
 {
   printf("Get EK Data\n");
 
@@ -106,9 +106,8 @@ on_interest1(const uint8_t* interest, uint32_t interest_size)
   return 0;
 }
 
-
 int
-on_interest2(const uint8_t* interest, uint32_t interest_size)
+on_time_interest(const uint8_t* interest, uint32_t interest_size)
 {
   int ret_val = -1;
   ndn_encoder_t encoder;
@@ -151,7 +150,7 @@ on_interest2(const uint8_t* interest, uint32_t interest_size)
   data.name = interest1.name;
 
   // encrypt the content
-  if (aes_key == NULL) {
+  if (aes_key != NULL) {
     char keyid_string[] = "/ndn/SD/erynn/time/KEY/100";
     ndn_name_t keyid;
     ret_val = ndn_name_from_string(&keyid, keyid_string, sizeof(keyid_string));
@@ -260,7 +259,7 @@ main(int argc, char *argv[])
   if (ret_val != 0) {
     print_error("controller", "time service register prefix", "ndn_name_from_string", ret_val);
   }
-  ret_val = ndn_direct_face_register_prefix(&prefix2, on_interest2);
+  ret_val = ndn_direct_face_register_prefix(&prefix2, on_time_interest);
   if (ret_val != 0) {
     print_error("controller", "time service register prefix", "ndn_direct_face_register_prefix", ret_val);
   }
@@ -278,7 +277,7 @@ main(int argc, char *argv[])
   ndn_interest_t interest;
   ndn_interest_from_block(&interest, interest_encoder.output_value, interest_encoder.offset);
   ndn_direct_face_express_interest(&interest.name, interest_encoder.output_value,
-                                   interest_encoder.offset, on_data, NULL);
+                                   interest_encoder.offset, on_ek_data, NULL);
 
   while (true) {
     ndn_udp_multicast_face_recv(udp_face);

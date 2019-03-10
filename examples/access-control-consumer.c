@@ -38,6 +38,7 @@ const uint8_t pub[] = {
 
 ndn_ecc_pub_t* pub_key = NULL;
 ndn_ecc_prv_t* prv_key = NULL;
+ndn_aes_key_t* aes_key = NULL;
 char* defaultaddr = "225.0.0.37";
 in_addr_t multicast_ip;
 uint8_t receiving_buff[4096] = {0};
@@ -88,7 +89,17 @@ on_time_data(const uint8_t* data, uint32_t data_size)
     printf("producer %s %s %d\n", "on_data", "ndn_data_tlv_decode_digest_verify", ret_val);
   }
 
-  printf("The current time is: %s\n", response.content_value);
+  uint8_t decrypt_output[50] = {0};
+  uint32_t used = 0;
+  ndn_name_t identity;
+  uint8_t iv[32] = {0};
+  ret_val = ndn_data_parse_encrypted_content(&response, decrypt_output,
+                                             &used, &identity, iv, &aes_key);
+  if (ret_val != 0) {
+    print_error("consumer", "decrypt time", "ndn_data_parse_encrypted_content", ret_val);
+  }
+
+  printf("The current time is: %.*s\n", used, decrypt_output);
   g_step = ASYNC_STEP_AFTER_TIME;
 
   return 0;
@@ -103,13 +114,13 @@ int on_advertisement(const uint8_t* interest, uint32_t interest_size){
     }
     printf("OnAdvertisement\n");
     ndn_sd_on_advertisement_process(&decoded_interest);
-    
+
     return NDN_SUCCESS;
 }
 
 int on_query_response(const uint8_t* rawdata, uint32_t data_size){
     ndn_data_t data;
-    
+
     int ret_val = ndn_data_tlv_decode_ecdsa_verify(&data, rawdata, data_size, pub_key);
     if (ret_val != 0) {
         printf("ERROR: ndn_data_tlv_decode_ecdsa_verify (%d)\n", ret_val);
@@ -117,7 +128,7 @@ int on_query_response(const uint8_t* rawdata, uint32_t data_size){
     }
     printf("OnQueryResponse\n");
     ndn_sd_on_query_response_process(&data);
-    
+
     return NDN_SUCCESS;
 }
 
@@ -142,7 +153,7 @@ send_time_request()
 }
 
 int
-on_data(const uint8_t* data, uint32_t data_size)
+on_dk_data(const uint8_t* data, uint32_t data_size)
 {
   printf("Get DK Data\n");
 
@@ -157,6 +168,12 @@ on_data(const uint8_t* data, uint32_t data_size)
   ret_val = ndn_ac_on_ek_response_process(&response);
   if (ret_val != 0) {
     print_error("producer", "on_data", "ndn_ac_on_ek_response", ret_val);
+  }
+
+  // check whether the key is in the key storage
+  ndn_key_storage_get_aes_key(100, &aes_key);
+  if (aes_key == NULL) {
+    print_error("consumer", "on_data", "ndn_key_storage_get_aes_key", ret_val);
   }
 
   send_time_request();
@@ -260,7 +277,7 @@ main(int argc, char *argv[])
   ndn_interest_t interest;
   ndn_interest_from_block(&interest, interest_encoder.output_value, interest_encoder.offset);
   ndn_direct_face_express_interest(&interest.name, interest_encoder.output_value,
-                                   interest_encoder.offset, on_data, NULL);
+                                   interest_encoder.offset, on_dk_data, NULL);
 
   int count = 0;
   int service_number;
