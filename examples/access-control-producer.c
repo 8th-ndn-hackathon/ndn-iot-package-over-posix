@@ -149,17 +149,19 @@ on_interest2(const uint8_t* interest, uint32_t interest_size)
   strftime(data_string, 50, "the time is %H:%M:%S\n", current_time);
 
   data.name = interest1.name;
-  //ndn_data_set_content(&data, (uint8_t*)&tv, sizeof(struct timeval));
 
   // encrypt the content
-  char keyid_string[] = "/ndn/SD/erynn/time/KEY/100";
-  ndn_name_t keyid;
-  ret_val = ndn_name_from_string(&keyid, keyid_string, sizeof(keyid_string));
-  ndn_data_set_encrypted_content(&data, (uint8_t*)data_string, strlen(data_string),
-                                 &keyid, iv, aes_key);
+  if (aes_key == NULL) {
+    char keyid_string[] = "/ndn/SD/erynn/time/KEY/100";
+    ndn_name_t keyid;
+    ret_val = ndn_name_from_string(&keyid, keyid_string, sizeof(keyid_string));
+    ndn_data_set_encrypted_content(&data, (uint8_t*)data_string, strlen(data_string),
+                                   &keyid, iv, aes_key);
+  }
+  else {
+    ndn_data_set_content(&data, data_string, strlen(data_string));
+  }
 
-
-  // ndn_data_set_content(&data, data_string, strlen(data_string));
   ndn_metainfo_init(&data.metainfo);
   ndn_metainfo_set_content_type(&data.metainfo, NDN_CONTENT_TYPE_BLOB);
   encoder_init(&encoder, buffer, 4096);
@@ -230,8 +232,8 @@ main(int argc, char *argv[])
   ndn_direct_face_construct(666);
   udp_face = ndn_udp_multicast_face_construct(667, INADDR_ANY, 6363, multicast_ip);
 
-  // add route to AC
-  char prefix_string[] = "/ndn/AC";
+  // add route to the network
+  char prefix_string[] = "/ndn";
   ndn_name_t controller_prefix;
   ret_val = ndn_name_from_string(&controller_prefix, prefix_string, sizeof(prefix_string));
   if (ret_val != 0) {
