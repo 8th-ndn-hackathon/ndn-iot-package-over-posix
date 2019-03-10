@@ -94,7 +94,7 @@ on_time_data(const uint8_t* data, uint32_t data_size)
   ndn_name_t identity;
   uint8_t iv[32] = {0};
   ret_val = ndn_data_parse_encrypted_content(&response, decrypt_output,
-                                             &used, &identity, iv, &aes_key);
+                                             &used, &identity, iv, aes_key);
   if (ret_val != 0) {
     print_error("consumer", "decrypt time", "ndn_data_parse_encrypted_content", ret_val);
   }
