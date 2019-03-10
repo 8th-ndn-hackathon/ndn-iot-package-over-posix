@@ -334,7 +334,12 @@ main(int argc, char *argv[])
         }
         ndn_interest_from_name(&interest, &name_prefix);
         encoder_init(&encoder, buffer, 4096);
-        ret_val = ndn_signed_interest_ecdsa_sign(&interest, &component_consumer, prv_key);
+
+        ndn_name_t id;
+        const char* idname = "/ndn/Yu";
+        ndn_name_from_string(&id, idname, strlen(idname));
+
+        ret_val = ndn_signed_interest_ecdsa_sign(&interest, &id, prv_key);
         if (ret_val != 0) {
             printf("ERROR: ndn_signed_interest_ecdsa_sign (%d)\n", ret_val);
             return ret_val;
